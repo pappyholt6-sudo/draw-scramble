@@ -59,7 +59,7 @@
       }
     }
 
-    .panel, textarea, select, button {
+    select, textarea, button {
       font: inherit;
     }
 
@@ -154,7 +154,7 @@
 <body>
   <main class="card">
     <h1>WCA Cube Top Face Viewer</h1>
-    <p>Paste a scramble for any WCA cube event from 2x2 through 7x7, then view the top face after the scramble.</p>
+    <p>Paste a scramble for 2x2 through 7x7. Shows the top face after the scramble.</p>
 
     <div class="controls">
       <select id="sizeSelect">
@@ -166,7 +166,7 @@
         <option value="7">7x7</option>
       </select>
 
-      <textarea id="scrambleInput" placeholder="Paste scramble here...">R U R' U' F2 D R2 Uw Rw' F</textarea>
+      <textarea id="scrambleInput" placeholder="Paste scramble here...">R U R' U' F2 D L2 B U2</textarea>
     </div>
 
     <div class="row">
@@ -180,10 +180,10 @@
     <div class="viewer-wrap">
       <div id="viewer" class="viewer"></div>
       <div class="meta">
-        Supported notation:
+        Supported:
         <div><code>U D R L F B</code>, <code>'</code>, <code>2</code></div>
         <div><code>Rw Uw Fw</code>, <code>3Rw 2Uw</code>, lowercase wide aliases like <code>r u f</code></div>
-        <div style="margin-top:10px;">Shows the top face only.</div>
+        <div style="margin-top:10px;">Top face only.</div>
       </div>
     </div>
   </main>
@@ -203,225 +203,152 @@
     const statusEl = document.getElementById("status");
     const viewerEl = document.getElementById("viewer");
 
-    function makeFace(size, color) {
-      return Array.from({ length: size }, () => Array(size).fill(color));
-    }
-
     function makeCube(size) {
-      return {
-        U: makeFace(size, "U"),
-        D: makeFace(size, "D"),
-        F: makeFace(size, "F"),
-        B: makeFace(size, "B"),
-        R: makeFace(size, "R"),
-        L: makeFace(size, "L")
-      };
-    }
+      const stickers = [];
 
-    function cloneFace(face) {
-      return face.map(row => row.slice());
-    }
-
-    function rotateFaceCW(face) {
-      const n = face.length;
-      const out = Array.from({ length: n }, () => Array(n));
-      for (let r = 0; r < n; r++) {
-        for (let c = 0; c < n; c++) {
-          out[c][n - 1 - r] = face[r][c];
+      // U
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          stickers.push({ x: c, y: size - 1, z: r, nx: 0, ny: 1, nz: 0, color: "U" });
         }
       }
-      return out;
+
+      // D
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          stickers.push({ x: c, y: 0, z: size - 1 - r, nx: 0, ny: -1, nz: 0, color: "D" });
+        }
+      }
+
+      // F
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          stickers.push({ x: c, y: size - 1 - r, z: size - 1, nx: 0, ny: 0, nz: 1, color: "F" });
+        }
+      }
+
+      // B
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          stickers.push({ x: size - 1 - c, y: size - 1 - r, z: 0, nx: 0, ny: 0, nz: -1, color: "B" });
+        }
+      }
+
+      // R
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          stickers.push({ x: size - 1, y: size - 1 - r, z: c, nx: 1, ny: 0, nz: 0, color: "R" });
+        }
+      }
+
+      // L
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          stickers.push({ x: 0, y: size - 1 - r, z: size - 1 - c, nx: -1, ny: 0, nz: 0, color: "L" });
+        }
+      }
+
+      return { size, stickers };
     }
 
-    function getRow(face, r) {
-      return face[r].slice();
-    }
+    function rotateStickerCW(sticker, face, size) {
+      const s = sticker;
 
-    function setRow(face, r, vals) {
-      face[r] = vals.slice();
-    }
-
-    function getCol(face, c) {
-      return face.map(row => row[c]);
-    }
-
-    function setCol(face, c, vals) {
-      for (let i = 0; i < face.length; i++) face[i][c] = vals[i];
-    }
-
-    function rev(arr) {
-      return arr.slice().reverse();
-    }
-
-    function turnU(cube, layers = 1) {
-      const n = cube.U.length;
-      for (let layer = 0; layer < layers; layer++) {
-        if (layer === 0) cube.U = rotateFaceCW(cube.U);
-
-        const f = getRow(cube.F, layer);
-        const r = getRow(cube.R, layer);
-        const b = getRow(cube.B, layer);
-        const l = getRow(cube.L, layer);
-
-        setRow(cube.R, layer, f);
-        setRow(cube.B, layer, r);
-        setRow(cube.L, layer, b);
-        setRow(cube.F, layer, l);
+      if (face === "U") {
+        const x = s.x, z = s.z, nx = s.nx, nz = s.nz;
+        s.x = z;
+        s.z = size - 1 - x;
+        s.nx = nz;
+        s.nz = -nx;
+      } else if (face === "D") {
+        const x = s.x, z = s.z, nx = s.nx, nz = s.nz;
+        s.x = size - 1 - z;
+        s.z = x;
+        s.nx = -nz;
+        s.nz = nx;
+      } else if (face === "R") {
+        const y = s.y, z = s.z, ny = s.ny, nz = s.nz;
+        s.y = size - 1 - z;
+        s.z = y;
+        s.ny = -nz;
+        s.nz = ny;
+      } else if (face === "L") {
+        const y = s.y, z = s.z, ny = s.ny, nz = s.nz;
+        s.y = z;
+        s.z = size - 1 - y;
+        s.ny = nz;
+        s.nz = -ny;
+      } else if (face === "F") {
+        const x = s.x, y = s.y, nx = s.nx, ny = s.ny;
+        s.x = y;
+        s.y = size - 1 - x;
+        s.nx = ny;
+        s.ny = -nx;
+      } else if (face === "B") {
+        const x = s.x, y = s.y, nx = s.nx, ny = s.ny;
+        s.x = size - 1 - y;
+        s.y = x;
+        s.nx = -ny;
+        s.ny = nx;
       }
     }
 
-    function turnD(cube, layers = 1) {
-      const n = cube.D.length;
-      for (let layer = 0; layer < layers; layer++) {
-        const row = n - 1 - layer;
-        if (layer === 0) cube.D = rotateFaceCW(cube.D);
-
-        const f = getRow(cube.F, row);
-        const l = getRow(cube.L, row);
-        const b = getRow(cube.B, row);
-        const r = getRow(cube.R, row);
-
-        setRow(cube.L, row, f);
-        setRow(cube.B, row, l);
-        setRow(cube.R, row, b);
-        setRow(cube.F, row, r);
-      }
+    function inLayer(sticker, face, layers, size) {
+      if (face === "U") return sticker.y >= size - layers;
+      if (face === "D") return sticker.y < layers;
+      if (face === "R") return sticker.x >= size - layers;
+      if (face === "L") return sticker.x < layers;
+      if (face === "F") return sticker.z >= size - layers;
+      if (face === "B") return sticker.z < layers;
+      return false;
     }
 
-    function turnR(cube, layers = 1) {
-      const n = cube.R.length;
-      for (let layer = 0; layer < layers; layer++) {
-        const col = n - 1 - layer;
-        if (layer === 0) cube.R = rotateFaceCW(cube.R);
-
-        const u = getCol(cube.U, col);
-        const f = getCol(cube.F, col);
-        const d = getCol(cube.D, col);
-        const b = getCol(cube.B, layer);
-
-        setCol(cube.F, col, u);
-        setCol(cube.D, col, f);
-        setCol(cube.B, layer, rev(d));
-        setCol(cube.U, col, rev(b));
+    function applyTurn(cube, face, layers, turns) {
+      for (let t = 0; t < turns; t++) {
+        for (const sticker of cube.stickers) {
+          if (inLayer(sticker, face, layers, cube.size)) {
+            rotateStickerCW(sticker, face, cube.size);
+          }
+        }
       }
     }
-
-    function turnL(cube, layers = 1) {
-      const n = cube.L.length;
-      for (let layer = 0; layer < layers; layer++) {
-        const col = layer;
-        if (layer === 0) cube.L = rotateFaceCW(cube.L);
-
-        const u = getCol(cube.U, col);
-        const b = getCol(cube.B, n - 1 - layer);
-        const d = getCol(cube.D, col);
-        const f = getCol(cube.F, col);
-
-        setCol(cube.B, n - 1 - layer, rev(u));
-        setCol(cube.D, col, rev(b));
-        setCol(cube.F, col, d);
-        setCol(cube.U, col, f);
-      }
-    }
-
-    function turnF(cube, layers = 1) {
-      const n = cube.F.length;
-      for (let layer = 0; layer < layers; layer++) {
-        const topRow = n - 1 - layer;
-        const rightCol = layer;
-        const bottomRow = layer;
-        const leftCol = n - 1 - layer;
-
-        if (layer === 0) cube.F = rotateFaceCW(cube.F);
-
-        const u = getRow(cube.U, topRow);
-        const r = getCol(cube.R, rightCol);
-        const d = getRow(cube.D, bottomRow);
-        const l = getCol(cube.L, leftCol);
-
-        setCol(cube.R, rightCol, rev(u));
-        setRow(cube.D, bottomRow, r);
-        setCol(cube.L, leftCol, rev(d));
-        setRow(cube.U, topRow, l);
-      }
-    }
-
-    function turnB(cube, layers = 1) {
-      const n = cube.B.length;
-      for (let layer = 0; layer < layers; layer++) {
-        const topRow = layer;
-        const rightCol = n - 1 - layer;
-        const bottomRow = n - 1 - layer;
-        const leftCol = layer;
-
-        if (layer === 0) cube.B = rotateFaceCW(cube.B);
-
-        const u = getRow(cube.U, topRow);
-        const l = getCol(cube.L, leftCol);
-        const d = getRow(cube.D, bottomRow);
-        const r = getCol(cube.R, rightCol);
-
-        setCol(cube.L, leftCol, u);
-        setRow(cube.D, bottomRow, rev(l));
-        setCol(cube.R, rightCol, d);
-        setRow(cube.U, topRow, rev(r));
-      }
-    }
-
-    const TURN_FUNCS = {
-      U: turnU,
-      D: turnD,
-      R: turnR,
-      L: turnL,
-      F: turnF,
-      B: turnB
-    };
 
     function parseMove(token, size) {
-      const original = token;
-      token = token.trim();
-      if (!token) return null;
+      const original = token.trim();
+      if (!original) return null;
 
+      let tokenBase = original;
       let suffix = "";
-      if (token.endsWith("2")) {
+
+      if (tokenBase.endsWith("2")) {
         suffix = "2";
-        token = token.slice(0, -1);
-      } else if (token.endsWith("'")) {
+        tokenBase = tokenBase.slice(0, -1);
+      } else if (tokenBase.endsWith("'")) {
         suffix = "'";
-        token = token.slice(0, -1);
+        tokenBase = tokenBase.slice(0, -1);
       }
 
+      let face = null;
       let layers = 1;
-      let face = "";
       let wide = false;
 
-      const lowerWideMap = {
-        u: "U", d: "D", r: "R", l: "L", f: "F", b: "B"
-      };
+      const lowerWideMap = { u: "U", d: "D", r: "R", l: "L", f: "F", b: "B" };
 
-      if (/^[udrlfb]$/.test(token)) {
-        face = lowerWideMap[token];
-        wide = true;
+      if (/^[udrlfb]$/.test(tokenBase)) {
+        face = lowerWideMap[tokenBase];
         layers = 2;
+        wide = true;
       } else {
-        const m = token.match(/^(\d+)?([UDRLFB])(w)?$/);
-        if (!m) {
-          throw new Error(`Unsupported move: ${original}`);
-        }
-        const prefix = m[1];
+        const m = tokenBase.match(/^(\d+)?([UDRLFB])(w)?$/);
+        if (!m) throw new Error(`Unsupported move: ${original}`);
         face = m[2];
         wide = !!m[3];
-        if (prefix) {
-          layers = parseInt(prefix, 10);
+        if (m[1]) {
+          layers = parseInt(m[1], 10);
+          if (!wide) throw new Error(`Invalid move: ${original}`);
         } else if (wide) {
           layers = 2;
-        } else {
-          layers = 1;
         }
-      }
-
-      if (!wide && layers !== 1) {
-        throw new Error(`Invalid move: ${original}`);
       }
 
       if (layers < 1 || layers > Math.floor(size / 2)) {
@@ -430,16 +357,9 @@
 
       let turns = 1;
       if (suffix === "2") turns = 2;
-      if (suffix === "'") turns = 3;
+      else if (suffix === "'") turns = 3;
 
-      return { face, layers, turns };
-    }
-
-    function applyMove(cube, move) {
-      const fn = TURN_FUNCS[move.face];
-      for (let i = 0; i < move.turns; i++) {
-        fn(cube, move.layers);
-      }
+      return { face, layers, turns, wide };
     }
 
     function applyScramble(size, scramble) {
@@ -448,19 +368,23 @@
 
       for (const token of tokens) {
         const move = parseMove(token, size);
-        if (move) applyMove(cube, move);
+        if (move) applyTurn(cube, move.face, move.layers, move.turns);
       }
 
       return cube;
     }
 
     function renderTopFace(cube) {
-      const size = cube.U.length;
-      viewerEl.style.gridTemplateColumns = `repeat(${size}, 24px)`;
-      viewerEl.style.gridTemplateRows = `repeat(${size}, 24px)`;
+      const n = cube.size;
+      const top = cube.stickers
+        .filter(s => s.nx === 0 && s.ny === 1 && s.nz === 0 && s.y === n - 1)
+        .sort((a, b) => (a.z - b.z) || (a.x - b.x));
 
-      viewerEl.innerHTML = cube.U.flat().map(face =>
-        `<div class="sticker" style="background:${FACE_COLORS[face]}"></div>`
+      viewerEl.style.gridTemplateColumns = `repeat(${n}, 24px)`;
+      viewerEl.style.gridTemplateRows = `repeat(${n}, 24px)`;
+
+      viewerEl.innerHTML = top.map(s =>
+        `<div class="sticker" style="background:${FACE_COLORS[s.color]}"></div>`
       ).join("");
     }
 
@@ -473,8 +397,8 @@
         renderTopFace(cube);
         statusEl.textContent = scramble ? `Applied to ${size}x${size}.` : `Showing solved ${size}x${size} top face.`;
       } catch (err) {
-        statusEl.textContent = err.message;
         viewerEl.innerHTML = "";
+        statusEl.textContent = err.message;
       }
     }
 
